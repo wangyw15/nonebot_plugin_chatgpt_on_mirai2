@@ -2,9 +2,8 @@ import json
 import re
 
 from nonebot import get_driver
-from nonebot.adapters.onebot.v11 import (Bot,
-                                         Event,
-                                         GroupMessageEvent, PrivateMessageEvent)
+from nonebot.adapters.mirai2.event import GroupMessage, FriendMessage, Event
+from nonebot.adapters.mirai2.bot import Bot
 from nonebot.log import logger
 from nonebot.plugin import on_regex, on_fullmatch
 from nonebot.params import ArgPlainText
@@ -29,7 +28,7 @@ privateConversations: dict[int, Conversation] = {}
 @Dump.handle()
 async def _(event: Event):
     userId = event.get_user_id()
-    if isinstance(event, GroupMessageEvent):
+    if isinstance(event, GroupMessage):
         groupId = event.group_id
         groupPanel = groupPanels.get(groupId)
         if groupPanel:
@@ -47,7 +46,7 @@ async def _(bot: Bot, event: Event):
     userInput: str = re.sub(r"^/talk\s+", '', msg)
     if not userInput:
         await Chat.finish("输入不能为空!", at_sender=True)
-    if isinstance(event, GroupMessageEvent):
+    if isinstance(event, GroupMessage):
         groupId = event.group_id
         userId = event.get_user_id()
         if not groupPanels.get(groupId):
@@ -66,7 +65,7 @@ async def _(bot: Bot, event: Event):
         #     answer = "获取gpt回答失败,访问请求速度过快或是网络波动orz\n若反复出现,可尝试使用/chat delete 序号 命令来删除该对话并重新创建"
         #     logger.error(str(e))
         await Chat.finish(answer, at_sender=True)
-    if isinstance(event, PrivateMessageEvent):
+    if isinstance(event, FriendMessage):
         userId = event.get_user_id()
         if not privateConversations.get(userId):
             await Chat.finish("尚未创建过对话!请用/chat create命令来创建对话!")
@@ -87,7 +86,7 @@ async def _(event: Event):
     msg = event.get_plaintext()
     msg = re.sub(r"^/chat\s+join\s+", '', msg)
     id = int(msg)
-    if isinstance(event, GroupMessageEvent):
+    if isinstance(event, GroupMessage):
         groupPanel = groupPanels.get(event.group_id)
         if not groupPanel:
             await Join.finish("本群尚未创建过对话!请用/chat create命令来创建对话!", at_sender=True)
@@ -123,7 +122,7 @@ async def _(event: Event):
     msg = event.get_plaintext()
     msg = re.sub(r"^/chat\s+delete\s+", '', msg)
     id = int(msg)
-    if isinstance(event, GroupMessageEvent):
+    if isinstance(event, GroupMessage):
         groupPanel = groupPanels.get(event.group_id)
         if not groupPanel:
             await Join.finish("本群尚未创建过对话!", at_sender=True)
@@ -151,7 +150,7 @@ async def _(event: Event):
 
 @ShowList.handle()
 async def _(bot: Bot, event: Event):
-    if isinstance(event, GroupMessageEvent):
+    if isinstance(event, GroupMessage):
         curPanel: GroupPanel = groupPanels.get(event.group_id)
         if not curPanel:
             await ShowList.finish("本群尚未创建过对话", at_sender=True)
@@ -162,7 +161,7 @@ async def _(bot: Bot, event: Event):
             for conversation in curPanel.conversations:
                 msg += f"{curPanel.conversations.index(conversation)+1} 创建者:{conversation.owner.id}\n"
             await ShowList.finish(msg, at_sender=True)
-    elif isinstance(event, PrivateMessageEvent):
+    elif isinstance(event, FriendMessage):
         await ShowList.finish("私聊中无法展示列表(最多只有一个对话)")
 
 # 暂时完成
@@ -179,14 +178,14 @@ async def _(bot: Bot, event: Event):
                 customPrompt, userID)
         except NoApiKeyError:
             await CreateConversationWithPrompt.finish("请机器人管理员在设置中添加APIKEY！")
-        if isinstance(event, GroupMessageEvent):  # 当在群聊中时
+        if isinstance(event, GroupMessage):  # 当在群聊中时
             if not groupPanels.get(event.group_id):  # 没有时创建新的groupPanel
                 groupPanels[event.group_id] = GroupPanel()
             groupPanels[event.group_id].conversations.append(newConversation)
             groupPanels[event.group_id].userInConversation[userID] = newConversation
             await CreateConversationWithPrompt.finish(f"创建成功!", at_sender=True)
 
-        elif isinstance(event, PrivateMessageEvent):  # 当在私聊中时
+        elif isinstance(event, FriendMessage):  # 当在私聊中时
             if privateConversations[userID]:
                 await CreateConversationWithPrompt.finish("已存在一个对话,请先删除")
             else:
@@ -209,7 +208,7 @@ async def CreateConversation(event: Event):
 async def Create(event: Event, id: str = ArgPlainText("template")):
     ifGroup = True
     userId = event.get_user_id()
-    if isinstance(event, PrivateMessageEvent):
+    if isinstance(event, FriendMessage):
         ifGroup = False
         if privateConversations.get(userId):
             await CreateConversationWithTemplate.finish("已存在一个对话，请先删除该对话!")
@@ -263,11 +262,11 @@ async def GetJson(event: Event, jsonStr: str = ArgPlainText("jsonStr")):
     except NoApiKeyError:
         await CreateConversationWithJson.finish("请机器人管理员在设置中添加APIKEY！")
 
-    if isinstance(event, GroupMessageEvent):
+    if isinstance(event, GroupMessage):
         groupPanels[event.group_id].conversations.append(newConversation)
         groupPanels[event.group_id].userInConversation[event.get_user_id()
                                                        ] = newConversation
         await CreateConversationWithJson.send("创建对话成功!", at_sender=True)
-    elif isinstance(event, PrivateMessageEvent):
+    elif isinstance(event, FriendMessage):
         privateConversations[event.get_user_id()] = newConversation
         await CreateConversationWithJson.send("创建对话成功!")
