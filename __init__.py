@@ -29,7 +29,7 @@ privateConversations: dict[int, Conversation] = {}
 async def _(event: Event):
     userId = event.get_user_id()
     if isinstance(event, GroupMessage):
-        groupId = event.group_id
+        groupId = event.sender.group.id
         groupPanel = groupPanels.get(groupId)
         if groupPanel:
             userConver: Conversation = groupPanel.userInConversation.get(
@@ -47,7 +47,7 @@ async def _(bot: Bot, event: Event):
     if not userInput:
         await Chat.finish("输入不能为空!", at_sender=True)
     if isinstance(event, GroupMessage):
-        groupId = event.group_id
+        groupId = event.sender.group.id
         userId = event.get_user_id()
         if not groupPanels.get(groupId):
             await Chat.finish("当前群尚未创建过对话!请用/chat create命令来创建对话!", at_sender=True)
@@ -87,7 +87,7 @@ async def _(event: Event):
     msg = re.sub(r"^/chat\s+join\s+", '', msg)
     id = int(msg)
     if isinstance(event, GroupMessage):
-        groupPanel = groupPanels.get(event.group_id)
+        groupPanel = groupPanels.get(event.sender.group.id)
         if not groupPanel:
             await Join.finish("本群尚未创建过对话!请用/chat create命令来创建对话!", at_sender=True)
         if id < 1 or id > len(groupPanel.conversations):
@@ -123,7 +123,7 @@ async def _(event: Event):
     msg = re.sub(r"^/chat\s+delete\s+", '', msg)
     id = int(msg)
     if isinstance(event, GroupMessage):
-        groupPanel = groupPanels.get(event.group_id)
+        groupPanel = groupPanels.get(event.sender.group.id)
         if not groupPanel:
             await Join.finish("本群尚未创建过对话!", at_sender=True)
         if id < 1 or id > len(groupPanel.conversations):
@@ -151,7 +151,7 @@ async def _(event: Event):
 @ShowList.handle()
 async def _(bot: Bot, event: Event):
     if isinstance(event, GroupMessage):
-        curPanel: GroupPanel = groupPanels.get(event.group_id)
+        curPanel: GroupPanel = groupPanels.get(event.sender.group.id)
         if not curPanel:
             await ShowList.finish("本群尚未创建过对话", at_sender=True)
         elif len(curPanel.conversations) == 0:
@@ -179,10 +179,10 @@ async def _(bot: Bot, event: Event):
         except NoApiKeyError:
             await CreateConversationWithPrompt.finish("请机器人管理员在设置中添加APIKEY！")
         if isinstance(event, GroupMessage):  # 当在群聊中时
-            if not groupPanels.get(event.group_id):  # 没有时创建新的groupPanel
-                groupPanels[event.group_id] = GroupPanel()
-            groupPanels[event.group_id].conversations.append(newConversation)
-            groupPanels[event.group_id].userInConversation[userID] = newConversation
+            if not groupPanels.get(event.sender.group.id):  # 没有时创建新的groupPanel
+                groupPanels[event.sender.group.id] = GroupPanel()
+            groupPanels[event.sender.group.id].conversations.append(newConversation)
+            groupPanels[event.sender.group.id].userInConversation[userID] = newConversation
             await CreateConversationWithPrompt.finish(f"创建成功!", at_sender=True)
 
         elif isinstance(event, FriendMessage):  # 当在私聊中时
@@ -235,10 +235,10 @@ async def Create(event: Event, id: str = ArgPlainText("template")):
     # else:
     #     await CreateConversationWithTemplate.finish("不存在该序号!")
     if ifGroup:
-        if not groupPanels.get(event.group_id):
-            groupPanels[event.group_id] = GroupPanel()
-        groupPanels[event.group_id].userInConversation[userId] = newConversation
-        groupPanels[event.group_id].conversations.append(newConversation)
+        if not groupPanels.get(event.sender.group.id):
+            groupPanels[event.sender.group.id] = GroupPanel()
+        groupPanels[event.sender.group.id].userInConversation[userId] = newConversation
+        groupPanels[event.sender.group.id].conversations.append(newConversation)
     else:
         privateConversations[userId] = newConversation
 
@@ -263,8 +263,8 @@ async def GetJson(event: Event, jsonStr: str = ArgPlainText("jsonStr")):
         await CreateConversationWithJson.finish("请机器人管理员在设置中添加APIKEY！")
 
     if isinstance(event, GroupMessage):
-        groupPanels[event.group_id].conversations.append(newConversation)
-        groupPanels[event.group_id].userInConversation[event.get_user_id()
+        groupPanels[event.sender.group.id].conversations.append(newConversation)
+        groupPanels[event.sender.group.id].userInConversation[event.get_user_id()
                                                        ] = newConversation
         await CreateConversationWithJson.send("创建对话成功!", at_sender=True)
     elif isinstance(event, FriendMessage):
